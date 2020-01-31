@@ -41,79 +41,6 @@ export default function(Module) {
     let accessor = new DataAccessor();
     const SIDES = ["zero", "one", "two"];
 
-    /**
-     * Map a string name of a computation function to a value in the
-     * `t_computed_function_name` enum.
-     *
-     * @param {String} name The name of a computation function.
-     */
-    function name_to_computation(name) {
-        switch (name) {
-            case "+":
-                return __MODULE__.t_computed_function_name.ADD;
-            case "-":
-                return __MODULE__.t_computed_function_name.SUBTRACT;
-            case "*":
-                return __MODULE__.t_computed_function_name.MULTIPLY;
-            case "/":
-                return __MODULE__.t_computed_function_name.DIVIDE;
-            case "1/x":
-                return __MODULE__.t_computed_function_name.INVERT;
-            case "x^2":
-                return __MODULE__.t_computed_function_name.POW;
-            case "sqrt":
-                return __MODULE__.t_computed_function_name.SQRT;
-            case "abs":
-                return __MODULE__.t_computed_function_name.ABS;
-            case "%":
-                return __MODULE__.t_computed_function_name.PERCENT_A_OF_B;
-            case "Uppercase":
-                return __MODULE__.t_computed_function_name.UPPERCASE;
-            case "Lowercase":
-                return __MODULE__.t_computed_function_name.LOWERCASE;
-            case "length":
-                return __MODULE__.t_computed_function_name.LENGTH;
-            case "concat_space":
-                return __MODULE__.t_computed_function_name.CONCAT_SPACE;
-            case "concat_comma":
-                return __MODULE__.t_computed_function_name.CONCAT_COMMA;
-            case "Bucket (10)":
-                return __MODULE__.t_computed_function_name.BUCKET_10;
-            case "Bucket (100)":
-                return __MODULE__.t_computed_function_name.BUCKET_100;
-            case "Bucket (1000)":
-                return __MODULE__.t_computed_function_name.BUCKET_1000;
-            case "Bucket (1/10)":
-                return __MODULE__.t_computed_function_name.BUCKET_0_1;
-            case "Bucket (1/100)":
-                return __MODULE__.t_computed_function_name.BUCKET_0_0_1;
-            case "Bucket (1/1000)":
-                return __MODULE__.t_computed_function_name.BUCKET_0_0_0_1;
-            case "Hour of Day":
-                return __MODULE__.t_computed_function_name.HOUR_OF_DAY;
-            case "Day of Week":
-                return __MODULE__.t_computed_function_name.DAY_OF_WEEK;
-            case "Month of Year":
-                return __MODULE__.t_computed_function_name.MONTH_OF_YEAR;
-            case "Bucket (s)":
-                return __MODULE__.t_computed_function_name.SECOND_BUCKET;
-            case "Bucket (m)":
-                return __MODULE__.t_computed_function_name.MINUTE_BUCKET;
-            case "Bucket (h)":
-                return __MODULE__.t_computed_function_name.HOUR_BUCKET;
-            case "Bucket (D)":
-                return __MODULE__.t_computed_function_name.DAY_BUCKET;
-            case "Bucket (W)":
-                return __MODULE__.t_computed_function_name.WEEK_BUCKET;
-            case "Bucket (M)":
-                return __MODULE__.t_computed_function_name.MONTH_BUCKET;
-            case "Bucket (Y)":
-                return __MODULE__.t_computed_function_name.YEAR_BUCKET;
-            default:
-                return null;
-        }
-    }
-
     /***************************************************************************
      *
      * Private
@@ -1437,6 +1364,31 @@ export default function(Module) {
     };
 
     /**
+     * Return an Object containing computed function metadata. Keys are strings,
+     * and each value is an Object containing the following metadata:
+     *
+     * - computed_function_name: the name of the computed function
+     * - input_type: the type of its input columns (all input columns are of
+     * the same type)
+     * - return_type: the return type of its output column
+     * - group: a category for the function
+     * - num_params: the number of input parameters
+     * - format_function: an anonymous function used for naming new columns
+     */
+    table.prototype.get_computed_functions = function() {
+        const two_params = ["add", "subtract", "multiply", "divide", "percent_a_of_b", "concat_space", "concat_comma"];
+        let functions = extract_map(__MODULE__.get_computed_functions());
+        for (const f in functions) {
+            if (functions.hasOwnProperty(f)) {
+                functions[f] = extract_map(functions[f]);
+                functions[f]["num_params"] = two_params.includes(f) ? 2 : 1;
+            }
+        }
+        console.log(functions);
+        return functions;
+    };
+
+    /**
      * Create a new table with the addition of new computed columns (defined as
      * javascript functions)
      *
@@ -1444,12 +1396,6 @@ export default function(Module) {
      */
     table.prototype.add_computed = function(computed) {
         let _Table;
-
-        for (let c of computed) {
-            if (c["computed_function_name"]) {
-                c["computed_function_name"] = name_to_computation(c["computed_function_name"]);
-            }
-        }
 
         try {
             _Table = __MODULE__.make_computed_table(this._Table, computed);
