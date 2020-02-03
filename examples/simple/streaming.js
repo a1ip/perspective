@@ -31,7 +31,7 @@ window.addEventListener("WebComponentsReady", function() {
     var elem = document.getElementsByTagName("perspective-viewer")[0];
     // eslint-disable-next-line no-undef
     var table = perspective.worker().table(newRows(), {
-        limit: 500
+        index: "name"
     });
     elem.load(table);
 

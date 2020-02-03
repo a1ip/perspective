@@ -20,6 +20,8 @@
 #include <perspective/rlookup.h>
 #include <perspective/gnode_state.h>
 #include <perspective/sparse_tree.h>
+#include <perspective/computed.h>
+#include <perspective/computed_function.h>
 #ifdef PSP_PARALLEL_FOR
 #include <tbb/parallel_sort.h>
 #include <tbb/tbb.h>
@@ -28,7 +30,7 @@
 
 namespace perspective {
 
-typedef std::function<void(std::shared_ptr<t_data_table>, std::shared_ptr<t_data_table>, const std::vector<t_rlookup>&)> t_computed_column_lambda;
+typedef std::function<void(std::shared_ptr<t_data_table>)> t_computed_column_lambda;
 
 PERSPECTIVE_EXPORT t_tscalar calc_delta(
     t_value_transition trans, t_tscalar oval, t_tscalar nval);
@@ -152,7 +154,7 @@ public:
     std::vector<t_computed_column_lambda> get_computed_lambdas() const;
 
 protected:
-    void recompute_columns(std::shared_ptr<t_data_table> table, std::shared_ptr<t_data_table> flattened, const std::vector<t_rlookup>& updated_ridxs);
+    void recompute_columns(std::shared_ptr<t_data_table> table);
     void append_computed_lambdas(std::vector<t_computed_column_lambda> new_lambdas);
 
     bool have_context(const std::string& name) const;
@@ -287,6 +289,41 @@ t_gnode::update_context_from_state(CTX_T* ctx, const t_data_table& flattened) {
 
     if (flattened.size() == 0)
         return;
+
+    // Make computed column
+    t_data_table& tbl = const_cast<t_data_table&>(flattened);
+    auto computed_columns = ctx->get_config().get_computed_columns();
+
+    for (auto c : computed_columns) {
+        std::vector<t_dtype> input_types;
+        std::vector<std::shared_ptr<t_column>> input_columns;
+
+        std::string computed_column_name = std::get<0>(c);
+        t_computed_function_name computed_function_name = std::get<1>(c);
+        std::vector<std::string> input_column_names = std::get<2>(c);
+        
+        for (const auto& name : input_column_names) {
+            auto column = tbl.get_column(name);
+            input_columns.push_back(column);
+            input_types.push_back(column->get_dtype());
+        }
+
+        t_computation computation = t_computed_column::get_computation(
+            computed_function_name, input_types);
+        t_dtype output_column_type = computation.m_return_type;
+
+        auto output_column = tbl.add_column_sptr(
+            computed_column_name, output_column_type, true);
+        output_column->reserve(input_columns[0]->size());
+
+        t_computed_column::apply_computation(
+            input_columns,
+            output_column,
+            computation);   
+    }
+
+    std::cout << "Updating context:" << std::endl;
+    flattened.pprint();
 
     ctx->step_begin();
     ctx->notify(flattened);

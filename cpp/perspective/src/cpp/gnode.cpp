@@ -359,9 +359,13 @@ t_gnode::_process_table() {
         lkup[idx] = cstate.lookup(pkey);
     }
 
-    recompute_columns(get_table_sptr(), flattened, lkup);
+    // Flattened only contains the state of the table from the update, i.e.
+    // A single tick
+    recompute_columns(flattened);
 
     if (m_state->mapping_size() == 0) {
+        // The context has already been notified of the entire Table, so break
+        std::cout << "no map, break early" << std::endl;
         m_state->update_history(flattened.get());
         _update_contexts_from_state(*flattened);
         m_oports[PSP_PORT_FLATTENED]->set_table(flattened);
@@ -616,6 +620,9 @@ t_gnode::_process() {
 
     std::shared_ptr<t_data_table> flattened_masked = _process_table();
     if (flattened_masked) {
+        // The flattened state of the Table after an update
+        std::cout << "Flattened masked:" << std::endl;
+        flattened_masked->pprint();
         notify_contexts(*flattened_masked);
     }
 
@@ -782,9 +789,12 @@ t_gnode::_register_context(const std::string& name, t_ctx_type type, std::int64_
     m_contexts[name] = ch;
 
     bool should_update = m_state->mapping_size() > 0;
+    std::cout << "registering context, should update: " << std::boolalpha << should_update << std::endl;
 
     std::shared_ptr<t_data_table> flattened;
 
+    // TODO: need to make sure that cases of `should_update == false` are
+    // handled by computed column creation
     if (should_update) {
         flattened = m_state->get_pkeyed_table();
     }
@@ -1292,9 +1302,9 @@ t_gnode::register_context(const std::string& name, std::shared_ptr<t_ctx_grouped
 }
 
 void 
-t_gnode::recompute_columns(std::shared_ptr<t_data_table> table, std::shared_ptr<t_data_table> flattened, const std::vector<t_rlookup>& updated_ridxs) {
+t_gnode::recompute_columns(std::shared_ptr<t_data_table> table) {
     for (auto l : m_computed_lambdas) {
-        l(table, flattened, updated_ridxs);
+        l(table);
     }
 }
 

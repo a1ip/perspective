@@ -18,6 +18,7 @@ t_view_config::t_view_config(
         const std::vector<std::string>& columns,
         const std::vector<std::tuple<std::string, std::string, std::vector<t_tscalar>>>& filter,
         const std::vector<std::vector<std::string>>& sort,
+        const std::vector<std::tuple<std::string, t_computed_function_name, std::vector<std::string>>>& computed_columns,
         const std::string& filter_op,
         bool column_only)
     : m_init(false)
@@ -27,6 +28,7 @@ t_view_config::t_view_config(
     , m_columns(columns)
     , m_filter(filter)
     , m_sort(sort)
+    , m_computed_columns(computed_columns)
     , m_row_pivot_depth(-1)
     , m_column_pivot_depth(-1)
     , m_filter_op(filter_op)
@@ -100,6 +102,12 @@ std::vector<t_sortspec>
 t_view_config::get_col_sortspec() const {
     PSP_VERBOSE_ASSERT(m_init, "touching uninited object");
     return m_col_sortspec;
+}
+
+std::vector<std::tuple<std::string, t_computed_function_name, std::vector<std::string>>>
+t_view_config::get_computed_columns() const {
+    PSP_VERBOSE_ASSERT(m_init, "touching uninited object");
+    return m_computed_columns;
 }
 
 t_filter_op
