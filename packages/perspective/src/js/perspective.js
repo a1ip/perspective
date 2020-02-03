@@ -1081,17 +1081,22 @@ export default function(Module) {
         const computed_schema = {};
 
         for (let i = 0; i < this.computed.length; i++) {
-            const column_name = this.computed[i].column;
-            const column_type = this.computed[i].type;
-
             const column = {};
 
-            column.type = column_type;
             column.input_columns = this.computed[i].inputs;
-            column.input_type = this.computed[i].input_type;
-            column.computation = this.computed[i].computation;
+            column.computed_function_name = this.computed[i].computed_function_name;
 
-            computed_schema[column_name] = column;
+            if (this.computed[i].computation) {
+                // A computation object will *always* be passed in via the UI,
+                // but is optional if programatically creating computed columns.
+                column.computation = this.computed[i].computation;
+
+                // Do not rename to `return_type` - the UI depends on `type`
+                column.type = column.computation.return_type;
+                column.input_type = column.computation.input_type;
+            }
+
+            computed_schema[this.computed[i].column] = column;
         }
 
         return computed_schema;

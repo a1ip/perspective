@@ -764,7 +764,7 @@ module.exports = perspective => {
                         computation: {
                             computed_function_name: "+",
                             input_type: "integer",
-                            type: "integer"
+                            return_type: "integer"
                         },
                         computed_function_name: "+",
                         column: "plus2",
@@ -778,11 +778,37 @@ module.exports = perspective => {
                         computation: {
                             computed_function_name: "+",
                             input_type: "integer",
-                            type: "integer"
+                            return_type: "integer"
                         },
+                        computed_function_name: "+",
                         input_columns: ["x", "x"],
                         input_type: "integer",
                         type: "integer"
+                    }
+                };
+
+                expect(result).toEqual(expected);
+                table2.delete();
+                table.delete();
+            });
+
+            it("Computed schema without computation should return inputs and computed_function_name", async function() {
+                const table = perspective.table(data);
+
+                // `column` is column name
+                const table2 = table.add_computed([
+                    {
+                        computed_function_name: "+",
+                        column: "plus2",
+                        inputs: ["x", "x"]
+                    }
+                ]);
+
+                const result = await table2.computed_schema();
+                const expected = {
+                    plus2: {
+                        computed_function_name: "+",
+                        input_columns: ["x", "x"]
                     }
                 };
 
