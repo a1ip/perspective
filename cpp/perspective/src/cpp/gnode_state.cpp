@@ -143,7 +143,7 @@ t_gstate::update_history(const t_data_table* tbl) {
         m_free.clear();
         m_mapping.clear();
 #ifdef PSP_PARALLEL_FOR
-        PSP_PFOR(0, int(ncols), 1,
+        tbb::parallel_for(0, int(ncols), 1,
             [&stable, &fcolumns, &col_translation](int idx)
 #else
         for (t_uindex idx = 0; idx < ncols; ++idx)
@@ -205,7 +205,7 @@ t_gstate::update_history(const t_data_table* tbl) {
     }
 
 #ifdef PSP_PARALLEL_FOR
-    PSP_PFOR(0, int(ncols), 1,
+    tbb::parallel_for(0, int(ncols), 1,
         [tbl, op_col, &col_translation, &fcolumns, &scolumns, &stableidx_vec](int colidx)
 #else
     for (t_uindex colidx = 0; colidx < ncols; ++colidx)
@@ -545,7 +545,7 @@ t_gstate::_get_pkeyed_table(const t_schema& schema, const t_mask& mask) const {
     const t_data_table* tbl = m_table.get();
 
 #ifdef PSP_PARALLEL_FOR
-    PSP_PFOR(0, int(o_ncols), 1,
+    tbb::parallel_forallel_for(0, int(o_ncols), 1,
         [&sch_cols, rval, tbl, &mask](int colidx)
 #else
     for (t_uindex colidx = 0; colidx < o_ncols; ++colidx)

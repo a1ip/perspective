@@ -286,7 +286,7 @@ t_gnode::populate_icols_in_flattened(
     }
 
 #ifdef PSP_PARALLEL_FOR
-    PSP_PFOR(0, int(ncols), 1,
+    tbb::parallel_for(0, int(ncols), 1,
         [&lkup, &icols, &ocols, nrows](int colidx)
 #else
     for (t_uindex colidx = 0; colidx < ncols; ++colidx)
@@ -359,9 +359,12 @@ t_gnode::_process_table() {
         lkup[idx] = cstate.lookup(pkey);
     }
 
-    // Flattened only contains the state of the table from the update, i.e.
-    // A single tick
-    recompute_columns(flattened);
+    // For each context, compute columns so they end up on flattened.
+    _compute_context_columns(get_table_sptr());
+    _compute_context_columns(flattened);
+
+    std::cout << "AFTER COMPUTE IN PROCESS_TABLE";
+    flattened->pprint();
 
     if (m_state->mapping_size() == 0) {
         // The context has already been notified of the entire Table, so break
@@ -384,21 +387,26 @@ t_gnode::_process_table() {
         m_iports[idx]->release_or_clear();
     }
 
+    // TODO: ugly
     std::shared_ptr<t_data_table> delta = m_oports[PSP_PORT_DELTA]->get_table();
     delta->clear();
     delta->reserve(fnrows);
+    _compute_context_columns(delta);
 
     std::shared_ptr<t_data_table> prev = m_oports[PSP_PORT_PREV]->get_table();
     prev->clear();
     prev->reserve(fnrows);
+    _compute_context_columns(prev);
 
     std::shared_ptr<t_data_table> current = m_oports[PSP_PORT_CURRENT]->get_table();
     current->clear();
     current->reserve(fnrows);
+    _compute_context_columns(current);
 
     std::shared_ptr<t_data_table> transitions = m_oports[PSP_PORT_TRANSITIONS]->get_table();
     transitions->clear();
     transitions->reserve(fnrows);
+    _compute_context_columns(transitions);
 
     std::shared_ptr<t_data_table> existed = m_oports[PSP_PORT_EXISTED]->get_table();
     existed->clear();
@@ -407,11 +415,18 @@ t_gnode::_process_table() {
 
     const t_schema& fschema = flattened->get_schema();
 
+    std::cout << "flattened schema: " << fschema << std::endl;
+
     std::shared_ptr<t_column> op_col_sptr = flattened->get_column("psp_op");
     t_column* op_col = op_col_sptr.get();
     t_data_table* stable = get_table();
     PSP_GNODE_VERIFY_TABLE(stable);
-    const t_schema& sschema = m_state->get_schema();
+
+    // TODO: we used to use gstate schema, would be nice if gstate schema was
+    // mutable so we could just add computed columns to the gstate schema
+    t_schema sschema = stable->get_schema().drop({"psp_pkey", "psp_op"});
+
+    std::cout << "state schema: " << sschema << std::endl;
 
     std::vector<const t_column*> fcolumns(flattened->num_columns());
     t_uindex ncols = sschema.get_num_columns();
@@ -509,7 +524,7 @@ t_gnode::_process_table() {
     }
 
 #ifdef PSP_PARALLEL_FOR
-    PSP_PFOR(0, int(ncols), 1,
+    tbb::parallel_for(0, int(ncols), 1,
         [&fcolumns, &scolumns, &dcolumns, &pcolumns, &ccolumns, &tcolumns, &col_translation,
             &op_base, &lkup, &prev_pkey_eq_vec, &added_offset, this](int colidx)
 #else
@@ -620,9 +635,6 @@ t_gnode::_process() {
 
     std::shared_ptr<t_data_table> flattened_masked = _process_table();
     if (flattened_masked) {
-        // The flattened state of the Table after an update
-        std::cout << "Flattened masked:" << std::endl;
-        flattened_masked->pprint();
         notify_contexts(*flattened_masked);
     }
 
@@ -702,6 +714,35 @@ t_gnode::set_ctx_state(void* ptr) {
     PSP_VERBOSE_ASSERT(m_init, "touching uninited object");
     CTX_T* ctx = static_cast<CTX_T*>(ptr);
     ctx->set_state(m_state);
+}
+
+void
+t_gnode::_compute_context_columns(std::shared_ptr<t_data_table> tbl) {
+    // TODO: need to compute post transition, i.e. get_table_sptr() and
+    // flattened
+    std::cout << "computing FOR ALL CONTEXTS" << std::endl;
+    for (auto& kv : m_contexts) {
+        auto& ctxh = kv.second;
+        switch (ctxh.m_ctx_type) {
+            case TWO_SIDED_CONTEXT: {
+                auto ctx = static_cast<t_ctx2*>(ctxh.m_ctx);
+                _compute_columns_sptr<t_ctx2>(ctx, tbl);
+            } break;
+            case ONE_SIDED_CONTEXT: {
+                auto ctx = static_cast<t_ctx1*>(ctxh.m_ctx);
+                _compute_columns_sptr<t_ctx1>(ctx, tbl);
+            } break;
+            case ZERO_SIDED_CONTEXT: {
+                auto ctx = static_cast<t_ctx0*>(ctxh.m_ctx);
+                _compute_columns_sptr<t_ctx0>(ctx, tbl);
+            } break;
+            case GROUPED_PKEY_CONTEXT: {
+                auto ctx = static_cast<t_ctx_grouped_pkey*>(ctxh.m_ctx);
+                _compute_columns_sptr<t_ctx_grouped_pkey>(ctx, tbl);
+            } break;
+            default: { PSP_COMPLAIN_AND_ABORT("Unexpected context type"); } break;
+        }
+    }
 }
 
 void
@@ -798,10 +839,6 @@ t_gnode::_register_context(const std::string& name, t_ctx_type type, std::int64_
     if (should_update) {
         flattened = m_state->get_pkeyed_table();
     }
-
-    auto pkeyed_tblcontext = m_state->get_port_schema().get_table_context();
-
-    auto non_pkeyed_tblcontext = m_state->get_table()->get_schema().get_table_context();
 
     switch (type) {
         case TWO_SIDED_CONTEXT: {
@@ -915,7 +952,7 @@ t_gnode::notify_contexts(const t_data_table& flattened) {
         }
     } else {
 #ifdef PSP_PARALLEL_FOR
-        PSP_PFOR(0, int(num_ctx), 1,
+        tbb::parallel_for(0, int(num_ctx), 1,
             [&notify_context_helper](int ctxidx)
 #else
         for (t_index ctxidx = 0; ctxidx < num_ctx; ++ctxidx)

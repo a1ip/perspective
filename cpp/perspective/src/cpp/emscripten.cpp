@@ -1304,7 +1304,7 @@ namespace binding {
 
     template <>
     std::shared_ptr<t_view_config>
-    make_view_config(const t_schema& schema, t_val date_parser, t_val config) {
+    make_view_config(std::shared_ptr<t_schema> schema, t_val date_parser, t_val config) {
         // extract vectors from JS, where they were created
         auto row_pivots = config.call<std::vector<std::string>>("get_row_pivots");
         auto column_pivots = config.call<std::vector<std::string>>("get_column_pivots");
@@ -1346,7 +1346,7 @@ namespace binding {
             // parse filter details
             std::string column_name = f.at(0).as<std::string>();
             std::string filter_op_str = f.at(1).as<std::string>();
-            t_dtype column_type = schema.get_dtype(column_name);
+            t_dtype column_type = schema->get_dtype(column_name);
             t_filter_op filter_operator = str_to_filter_op(filter_op_str);
 
             // validate the filter before it goes into the core engine
@@ -1367,7 +1367,6 @@ namespace binding {
 
         for (auto c : js_computed_columns) {
             std::string computed_column_name = c.at(0).as<std::string>();
-            std::cout << "Processing `" <<  computed_column_name << "`" << std::endl;
             t_computed_function_name computed_function_name = str_to_computed_function_name(
                 c.at(1).as<std::string>());
             std::vector<std::string> input_columns = vecFromArray<t_val, std::string>(c.at(2));
@@ -1406,7 +1405,7 @@ namespace binding {
     std::shared_ptr<View<CTX_T>>
     make_view(std::shared_ptr<Table> table, const std::string& name, const std::string& separator,
         t_val view_config, t_val date_parser) {
-        auto schema = table->get_schema();
+        std::shared_ptr<t_schema> schema = std::make_shared<t_schema>(table->get_schema());
         std::shared_ptr<t_view_config> config = make_view_config<t_val>(schema, date_parser, view_config);
 
         auto ctx = make_context<CTX_T>(table, schema, config, name);
@@ -1423,24 +1422,17 @@ namespace binding {
 
     template <>
     std::shared_ptr<t_ctx0>
-    make_context(std::shared_ptr<Table> table, const t_schema& schema,
+    make_context(std::shared_ptr<Table> table, std::shared_ptr<t_schema> schema,
         std::shared_ptr<t_view_config> view_config, const std::string& name) {
+        std::cout << "creating context" << std::endl;
         auto columns = view_config->get_columns();
         auto filter_op = view_config->get_filter_op();
         auto fterm = view_config->get_fterm();
         auto sortspec = view_config->get_sortspec();
         auto computed_columns = view_config->get_computed_columns();
 
-        t_schema& sc = const_cast<t_schema&>(schema);
-        for (auto c : computed_columns) {
-            columns.push_back(std::get<0>(c));
-            sc.add_column(std::get<0>(c), DTYPE_FLOAT64);
-        }
-
-        std::cout << sc << std::endl;
-
         auto cfg = t_config(columns, fterm, computed_columns, filter_op);
-        auto ctx0 = std::make_shared<t_ctx0>(sc, cfg);
+        auto ctx0 = std::make_shared<t_ctx0>(*(schema.get()), cfg);
         ctx0->init();
         ctx0->sort_by(sortspec);
 
@@ -1454,7 +1446,7 @@ namespace binding {
 
     template <>
     std::shared_ptr<t_ctx1>
-    make_context(std::shared_ptr<Table> table, const t_schema& schema,
+    make_context(std::shared_ptr<Table> table, std::shared_ptr<t_schema> schema,
        std::shared_ptr<t_view_config> view_config, const std::string& name) {
         auto row_pivots = view_config->get_row_pivots();
         auto aggspecs = view_config->get_aggspecs();
@@ -1464,14 +1456,9 @@ namespace binding {
         auto row_pivot_depth = view_config->get_row_pivot_depth();
         auto computed_columns = view_config->get_computed_columns();
 
-        t_schema& sc = const_cast<t_schema&>(schema);
-        for (auto c : computed_columns) {
-            sc.add_column(std::get<0>(c), DTYPE_FLOAT64);
-        }
-
         auto cfg = t_config(
             row_pivots, aggspecs, fterm, computed_columns, filter_op);
-        auto ctx1 = std::make_shared<t_ctx1>(sc, cfg);
+        auto ctx1 = std::make_shared<t_ctx1>(*(schema.get()), cfg);
 
         ctx1->init();
         ctx1->sort_by(sortspec);
@@ -1492,7 +1479,7 @@ namespace binding {
 
     template <>
     std::shared_ptr<t_ctx2>
-    make_context(std::shared_ptr<Table> table, const t_schema& schema,
+    make_context(std::shared_ptr<Table> table, std::shared_ptr<t_schema> schema,
         std::shared_ptr<t_view_config> view_config, const std::string& name) {
         bool column_only = view_config->is_column_only();
         auto row_pivots = view_config->get_row_pivots();
@@ -1504,19 +1491,13 @@ namespace binding {
         auto col_sortspec = view_config->get_col_sortspec();
         auto row_pivot_depth = view_config->get_row_pivot_depth();
         auto column_pivot_depth = view_config->get_column_pivot_depth();
+        auto computed_columns = view_config->get_computed_columns();
 
         t_totals total = sortspec.size() > 0 ? TOTALS_BEFORE : TOTALS_HIDDEN;
 
-        auto computed_columns = view_config->get_computed_columns();
-
-        t_schema& sc = const_cast<t_schema&>(schema);
-        for (auto c : computed_columns) {
-            sc.add_column(std::get<0>(c), DTYPE_FLOAT64);
-        }
-
         auto cfg = t_config(
             row_pivots, column_pivots, aggspecs, total, fterm, computed_columns, filter_op, column_only);
-        auto ctx2 = std::make_shared<t_ctx2>(sc, cfg);
+        auto ctx2 = std::make_shared<t_ctx2>(*(schema.get()), cfg);
 
         ctx2->init();
 

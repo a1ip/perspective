@@ -43,7 +43,9 @@ t_config::t_config(
     , m_fterms(fterms)
     , m_computed_columns(computed_columns)
     , m_combiner(combiner)
-    , m_fmode(FMODE_SIMPLE_CLAUSES) {}
+    , m_fmode(FMODE_SIMPLE_CLAUSES) {
+    setup(m_detail_columns);
+}
 
 // t_ctx1
 t_config::t_config(
@@ -151,6 +153,16 @@ t_config::t_config(const std::vector<std::string>& detail_columns)
     : t_config(detail_columns, {}, {}, FILTER_OP_AND) {}
 
 t_config::t_config() {}
+
+void
+t_config::setup(const std::vector<std::string>& detail_columns) {
+    t_index count = 0;
+    for (std::vector<std::string>::const_iterator iter = detail_columns.begin();
+         iter != detail_columns.end(); ++iter) {
+        m_detail_colmap[*iter] = count;
+        count++;
+    }
+}
 
 void
 t_config::setup(const std::vector<std::string>& detail_columns,

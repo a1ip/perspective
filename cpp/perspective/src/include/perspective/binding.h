@@ -312,7 +312,7 @@ namespace binding {
      */
     template <typename T>
     std::shared_ptr<t_view_config> make_view_config(
-        const t_schema& schema, T date_parser, T config);
+        std::shared_ptr<t_schema> schema, T date_parser, T config);
 
     /**
      * @brief Create a new view.
@@ -352,7 +352,7 @@ namespace binding {
     template <typename CTX_T>
     std::shared_ptr<CTX_T> make_context(
         std::shared_ptr<Table> table,
-        const t_schema& schema,
+        std::shared_ptr<t_schema> schema,
         std::shared_ptr<t_view_config> view_config,
         const std::string& name);
 

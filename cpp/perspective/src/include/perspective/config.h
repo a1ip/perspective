@@ -115,6 +115,14 @@ public:
     t_config(const std::vector<std::string>& detail_columns);
 
     t_config();
+    
+    /**
+     * @brief For each column in the config's `detail_columns` (i.e. visible
+     * columns), add it to the internal map tracking column indices.
+     * 
+     * @param detail_columns 
+     */
+    void setup(const std::vector<std::string>& detail_columns);
 
     void setup(const std::vector<std::string>& detail_columns,
         const std::vector<std::string>& sort_pivot,

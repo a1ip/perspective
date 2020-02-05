@@ -281,6 +281,8 @@ t_computed_column::apply_computation(
             }
         }
     }
+
+    output_column->pprint();
 }
 
 std::vector<t_computation> t_computed_column::computations = {};

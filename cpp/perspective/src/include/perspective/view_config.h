@@ -13,6 +13,7 @@
 #include <perspective/config.h>
 #include <perspective/raw_types.h>
 #include <perspective/scalar.h>
+#include <perspective/computed.h>
 #include <tsl/ordered_map.h>
 #include <tuple>
 
@@ -53,7 +54,7 @@ public:
      *
      * @param schema
      */
-    void init(const t_schema& schema);
+    void init(std::shared_ptr<t_schema> schema);
 
     /**
      * @brief Add filter terms manually, as the filter term must be calculated from the value
@@ -115,7 +116,7 @@ private:
      * @param schema
      * @return void
      */
-    void fill_aggspecs(const t_schema& schema);
+    void fill_aggspecs(std::shared_ptr<t_schema> schema);
 
     /**
      * @brief Fill the `m_fterm` vector with `t_fterm` objects which define the view's filters.
