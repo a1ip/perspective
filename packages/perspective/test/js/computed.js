@@ -94,7 +94,576 @@ const year_bucket = function(val) {
 };
 
 module.exports = perspective => {
-    describe("computed columns", function() {
+    describe("New computed columns", function() {
+        describe("Functionality", function() {
+            it("Should be able to create a computed column in `view()`", async function() {
+                const table = perspective.table(int_float_data);
+                const view = table.view({
+                    computed_columns: [
+                        {
+                            column: "int + float",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        }
+                    ]
+                });
+                const result = await view.to_columns();
+                console.log(result);
+                expect(result["int + float"]).toEqual([2.5, 4.5, 6.5, 8.5]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Should be able to create multiple computed columns in `view()`", async function() {
+                const table = perspective.table(int_float_data);
+                const view = table.view({
+                    computed_columns: [
+                        {
+                            column: "int + float",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        },
+                        {
+                            column: "uppercase",
+                            computed_function_name: "Uppercase",
+                            inputs: ["y"]
+                        }
+                    ]
+                });
+                const result = await view.to_columns();
+                expect(result["int + float"]).toEqual([2.5, 4.5, 6.5, 8.5]);
+                expect(result["uppercase"]).toEqual(["A", "B", "C", "D"]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Should be able to create multiple computed column in multiple `view()`s", async function() {
+                const table = perspective.table(int_float_data);
+                const view = table.view({
+                    computed_columns: [
+                        {
+                            column: "float + int",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        }
+                    ]
+                });
+                const view2 = table.view({
+                    computed_columns: [
+                        {
+                            column: "float - int",
+                            computed_function_name: "-",
+                            inputs: ["w", "x"]
+                        }
+                    ]
+                });
+
+                const schema = await view.schema();
+                const schema2 = await view2.schema();
+
+                expect(schema).toEqual({
+                    w: "float",
+                    x: "integer",
+                    y: "string",
+                    z: "boolean",
+                    "float + int": "float"
+                });
+
+                expect(schema2).toEqual({
+                    w: "float",
+                    x: "integer",
+                    y: "string",
+                    z: "boolean",
+                    "float - int": "float"
+                });
+
+                const result = await view.to_columns();
+                const result2 = await view2.to_columns();
+
+                expect(result).toEqual({
+                    w: [1.5, 2.5, 3.5, 4.5],
+                    x: [1, 2, 3, 4],
+                    y: ["a", "b", "c", "d"],
+                    z: [true, false, true, false],
+                    "float + int": [2.5, 4.5, 6.5, 8.5]
+                });
+
+                expect(result2).toEqual({
+                    w: [1.5, 2.5, 3.5, 4.5],
+                    x: [1, 2, 3, 4],
+                    y: ["a", "b", "c", "d"],
+                    z: [true, false, true, false],
+                    "float - int": [0.5, 0.5, 0.5, 0.5]
+                });
+
+                view2.delete();
+                view.delete();
+                table.delete();
+            });
+
+            it.skip("Should be able to create multiple computed column in multiple `view()`s with the same name", async function() {
+                const table = perspective.table(int_float_data);
+                const view = table.view({
+                    computed_columns: [
+                        {
+                            column: "float + int",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        }
+                    ]
+                });
+                const view2 = table.view({
+                    computed_columns: [
+                        {
+                            column: "float + int",
+                            computed_function_name: "-",
+                            inputs: ["w", "x"]
+                        }
+                    ]
+                });
+
+                const schema = await view.schema();
+                const schema2 = await view2.schema();
+
+                expect(schema).toEqual({
+                    w: "float",
+                    x: "integer",
+                    y: "string",
+                    z: "boolean",
+                    "float + int": "float"
+                });
+
+                expect(schema2).toEqual({
+                    w: "float",
+                    x: "integer",
+                    y: "string",
+                    z: "boolean",
+                    "float + int": "float"
+                });
+
+                const result = await view.to_columns();
+                const result2 = await view2.to_columns();
+
+                expect(result).toEqual({
+                    w: [1.5, 2.5, 3.5, 4.5],
+                    x: [1, 2, 3, 4],
+                    y: ["a", "b", "c", "d"],
+                    z: [true, false, true, false],
+                    "float + int": [2.5, 4.5, 6.5, 8.5]
+                });
+
+                expect(result2).toEqual({
+                    w: [1.5, 2.5, 3.5, 4.5],
+                    x: [1, 2, 3, 4],
+                    y: ["a", "b", "c", "d"],
+                    z: [true, false, true, false],
+                    "float + int": [0.5, 0.5, 0.5, 0.5]
+                });
+
+                view2.delete();
+                view.delete();
+                table.delete();
+            });
+
+            it("Dependent column updates should notify computed columns.", async function() {
+                const table = perspective.table(int_float_data, {index: "x"});
+                const view = table.view({
+                    computed_columns: [
+                        {
+                            column: "int + float",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        },
+                        {
+                            column: "uppercase",
+                            computed_function_name: "Uppercase",
+                            inputs: ["y"]
+                        }
+                    ]
+                });
+                const result = await view.to_columns();
+                expect(result["int + float"]).toEqual([2.5, 4.5, 6.5, 8.5]);
+                expect(result["uppercase"]).toEqual(["A", "B", "C", "D"]);
+                table.update({x: [2, 4], w: [10.5, 12.5]});
+                expect(result["int + float"]).toEqual([2.5, 12.5, 6.5, 16.5]);
+                table.update({x: [1, 3], y: ["hello", "world"]});
+                expect(result["uppercase"]).toEqual(["HELLO", "B", "WORLD", "D"]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Dependent column updates on all column updates should notify computed columns.", async function() {
+                const table = perspective.table(int_float_data, {index: "x"});
+                const view = table.view({
+                    computed_columns: [
+                        {
+                            column: "int + float",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        },
+                        {
+                            column: "uppercase",
+                            computed_function_name: "Uppercase",
+                            inputs: ["y"]
+                        }
+                    ]
+                });
+                const result = await view.to_columns();
+                expect(result["int + float"]).toEqual([2.5, 4.5, 6.5, 8.5]);
+                expect(result["uppercase"]).toEqual(["A", "B", "C", "D"]);
+                table.update({x: [2, 4], w: [10.5, 12.5]});
+                expect(result["int + float"]).toEqual([2.5, 12.5, 6.5, 16.5]);
+                table.update({x: [1, 3], y: ["hello", "world"]});
+                expect(result["uppercase"]).toEqual(["HELLO", "B", "WORLD", "D"]);
+                view.delete();
+                table.delete();
+            });
+
+            it("A new view should not inherit computed columns if not created.", async function() {
+                const table = perspective.table(int_float_data);
+                const view = table.view({
+                    computed_columns: [
+                        {
+                            column: "int + float",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        }
+                    ]
+                });
+                const result = await view.to_columns();
+                expect(result["int + float"]).toEqual([2.5, 4.5, 6.5, 8.5]);
+                expect(() => {
+                    table.view({
+                        columns: ["int + float", "x"]
+                    });
+                }).toThrow();
+                view.delete();
+                table.delete();
+            });
+
+            it("The view's underlying table should not have a mutated schema.", async function() {
+                const table = perspective.table(int_float_data);
+                const view = table.view({
+                    computed_columns: [
+                        {
+                            column: "int + float",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        }
+                    ]
+                });
+                const result = await view.to_columns();
+                expect(result["int + float"]).toEqual([2.5, 4.5, 6.5, 8.5]);
+                expect(await table.schema()).toEqual({
+                    w: "float",
+                    x: "integer",
+                    y: "string",
+                    z: "boolean"
+                });
+                view.delete();
+                table.delete();
+            });
+
+            it("Should be able to show a computed column.", async function() {
+                const table = perspective.table(int_float_data);
+                const view = table.view({
+                    columns: ["int + float"],
+                    computed_columns: [
+                        {
+                            column: "int + float",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        }
+                    ]
+                });
+                const result = await view.to_columns();
+                expect(result["int + float"]).toEqual([2.5, 4.5, 6.5, 8.5]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Should be able to hide a computed column.", async function() {
+                const table = perspective.table(int_float_data);
+                const view = table.view({
+                    columns: ["x"],
+                    computed_columns: [
+                        {
+                            column: "int + float",
+                            computed_function_name: "+",
+                            inputs: ["w", "x"]
+                        }
+                    ]
+                });
+                expect(await view.schema()).toEqual({
+                    x: "integer"
+                });
+                const result = await view.to_columns();
+                console.log("res:", result);
+                expect(result["int + float"]).toEqual(undefined);
+                expect(result["x"]).toEqual([1, 2, 3, 4]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Should be able to row pivot on a computed column.", async function() {});
+
+            it("Should be able to column pivot on a computed column.", async function() {});
+
+            it("Should be able to row + column pivot on a computed column.", async function() {});
+
+            it("Should be able to aggregate on a computed column.", async function() {});
+
+            it("Should be able to filter on a computed column.", async function() {});
+
+            it("Should be able to sort on a computed column.", async function() {});
+
+            it("Should be able to sort on a hidden computed column.", async function() {});
+        });
+
+        describe("Numeric, arity 1", function() {
+            it("Square root of int", async function() {
+                const table = perspective.table({
+                    a: [4, 9, 16, 20, 81, 1000]
+                });
+                let view = table.view({
+                    columns: ["sqrt"],
+                    computed_columns: [
+                        {
+                            column: "sqrt",
+                            computed_function_name: "sqrt",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.sqrt).toEqual([2, 3, 4, 4.47213595499958, 9, 31.622776601683793]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Square root of int, nulls", async function() {
+                const table = perspective.table({
+                    a: [4, 9, null, undefined, 16]
+                });
+                let view = table.view({
+                    columns: ["sqrt"],
+                    computed_columns: [
+                        {
+                            column: "sqrt",
+                            computed_function_name: "sqrt",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.sqrt).toEqual([2, 3, null, null, 4]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Square root of float", async function() {
+                const table = perspective.table({
+                    a: [4.5, 9.5, 16.5, 20.5, 81.5, 1000.5]
+                });
+                let view = table.view({
+                    columns: ["sqrt"],
+                    computed_columns: [
+                        {
+                            column: "sqrt",
+                            computed_function_name: "sqrt",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.sqrt).toEqual([2.1213203435596424, 3.082207001484488, 4.06201920231798, 4.527692569068709, 9.027735042633894, 31.63068130786942]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Square root of float, null", async function() {
+                const table = perspective.table({
+                    a: [4.5, 9.5, null, undefined, 16.5]
+                });
+                let view = table.view({
+                    columns: ["sqrt"],
+                    computed_columns: [
+                        {
+                            column: "sqrt",
+                            computed_function_name: "sqrt",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.sqrt).toEqual([2.1213203435596424, 3.082207001484488, null, null, 4.06201920231798]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Pow^2 of int", async function() {
+                const table = perspective.table({
+                    a: [2, 4, 6, 8, 10]
+                });
+                let view = table.view({
+                    columns: ["pow2"],
+                    computed_columns: [
+                        {
+                            column: "pow2",
+                            computed_function_name: "x^2",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.pow2).toEqual([4, 16, 36, 64, 100]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Pow^2 of int, nulls", async function() {
+                const table = perspective.table({
+                    a: [2, 4, null, undefined, 10]
+                });
+                let view = table.view({
+                    columns: ["pow2"],
+                    computed_columns: [
+                        {
+                            column: "pow2",
+                            computed_function_name: "x^2",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.pow2).toEqual([4, 16, null, null, 100]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Pow^2 of float", async function() {
+                const table = perspective.table({
+                    a: [2.5, 4.5, 6.5, 8.5, 10.5]
+                });
+                let view = table.view({
+                    columns: ["pow2"],
+                    computed_columns: [
+                        {
+                            column: "pow2",
+                            computed_function_name: "x^2",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.pow2).toEqual([6.25, 20.25, 42.25, 72.25, 110.25]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Pow^2 of float, nulls", async function() {
+                const table = perspective.table({
+                    a: [2.5, 4.5, null, undefined, 10.5]
+                });
+                let view = table.view({
+                    columns: ["pow2"],
+                    computed_columns: [
+                        {
+                            column: "pow2",
+                            computed_function_name: "x^2",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.pow2).toEqual([6.25, 20.25, null, null, 110.25]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Invert int", async function() {
+                const table = perspective.table({
+                    a: [2, 4, 6, 8, 10]
+                });
+                let view = table.view({
+                    columns: ["invert"],
+                    computed_columns: [
+                        {
+                            column: "invert",
+                            computed_function_name: "1/x",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.invert).toEqual([0.5, 0.25, 0.16666666666666666, 0.125, 0.1]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Invert int, nulls", async function() {
+                const table = perspective.table({
+                    a: [2, 4, null, undefined, 10]
+                });
+                let view = table.view({
+                    columns: ["invert"],
+                    computed_columns: [
+                        {
+                            column: "invert",
+                            computed_function_name: "1/x",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.invert).toEqual([0.5, 0.25, null, null, 0.1]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Invert float", async function() {
+                const table = perspective.table({
+                    a: [2.5, 4.5, 6.5, 8.5, 10.5]
+                });
+                let view = table.view({
+                    columns: ["invert"],
+                    computed_columns: [
+                        {
+                            column: "invert",
+                            computed_function_name: "1/x",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.invert).toEqual([0.4, 0.2222222222222222, 0.15384615384615385, 0.11764705882352941, 0.09523809523809523]);
+                view.delete();
+                table.delete();
+            });
+
+            it("Invert float, nulls", async function() {
+                const table = perspective.table({
+                    a: [2.5, 4.5, null, undefined, 10.5]
+                });
+                let view = table.view({
+                    columns: ["invert"],
+                    computed_columns: [
+                        {
+                            column: "invert",
+                            computed_function_name: "1/x",
+                            inputs: ["a"]
+                        }
+                    ]
+                });
+                let result = await view.to_columns();
+                expect(result.invert).toEqual([0.4, 0.2222222222222222, null, null, 0.09523809523809523]);
+                view.delete();
+                table.delete();
+            });
+        });
+    });
+
+    describe.skip("computed columns", function() {
         describe("Numeric, arity 1", function() {
             it("Square root of int", async function() {
                 const table = perspective

@@ -360,17 +360,15 @@ t_gnode::_process_table() {
     }
 
     // For each context, compute columns so they end up on flattened.
-    _compute_context_columns(get_table_sptr());
     _compute_context_columns(flattened);
 
-    std::cout << "AFTER COMPUTE IN PROCESS_TABLE";
-    flattened->pprint();
+    // Ensure that old code path works
+    recompute_columns(get_table_sptr());
 
     if (m_state->mapping_size() == 0) {
-        // The context has already been notified of the entire Table, so break
         std::cout << "no map, break early" << std::endl;
-        m_state->update_history(flattened.get());
         _update_contexts_from_state(*flattened);
+        m_state->update_history(flattened.get());
         m_oports[PSP_PORT_FLATTENED]->set_table(flattened);
         release_inputs();
         release_outputs();
