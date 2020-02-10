@@ -200,7 +200,7 @@ t_computed_column::apply_computation(
     std::uint32_t end = table_columns[0]->size();
     auto arity = table_columns.size();
 
-    std::cout << "num_rows: " << end << ", arity: " << arity << std::endl;
+    //std::cout << "num_rows: " << end << ", arity: " << arity << std::endl;
 
     std::function<t_tscalar(t_tscalar)> function_1;
     std::function<t_tscalar(t_tscalar, t_tscalar)> function_2;
@@ -282,7 +282,7 @@ t_computed_column::apply_computation(
         }
     }
 
-    output_column->pprint();
+    //output_column->pprint();
 }
 
 std::vector<t_computation> t_computed_column::computations = {};

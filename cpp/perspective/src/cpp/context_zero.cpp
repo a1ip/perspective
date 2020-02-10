@@ -552,8 +552,9 @@ t_ctx0::calc_step_delta(const t_data_table& flattened, const t_data_table& prev,
 
     t_uindex ncols = m_config.get_num_columns();
     const auto& column_names = m_config.get_column_names();
-    std::cout << column_names << std::endl;
+    //std::cout << column_names << std::endl;
 
+    /*
     std::cout << "flattened:";
     flattened.pprint();
     std::cout << "transitions:";
@@ -561,11 +562,11 @@ t_ctx0::calc_step_delta(const t_data_table& flattened, const t_data_table& prev,
     std::cout << "prev:";
     prev.pprint();
     std::cout << "curr:";
-    curr.pprint();
+    curr.pprint();    */
 
     for (const auto& name : column_names) {
         auto cidx = m_config.get_colidx(name);
-        std::cout << "step delta for col " << cidx << "'" << name << "'" <<std::endl;
+        //std::cout << "step delta for col " << cidx << "'" << name << "'" <<std::endl;
         const t_column* tcol = transitions.get_const_column(name).get();
         const t_column* pcol = prev.get_const_column(name).get();
         const t_column* ccol = curr.get_const_column(name).get();

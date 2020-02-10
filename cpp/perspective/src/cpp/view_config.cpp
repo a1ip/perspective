@@ -137,31 +137,6 @@ t_view_config::get_column_pivot_depth() const {
 // PRIVATE
 void
 t_view_config::fill_aggspecs(std::shared_ptr<t_schema> schema) {
-    /**
-     * Make sure that computed columns exist in the schema, and that they have
-     * the correct column type. This will erase the distinction between
-     * computed and "regular" columns.
-     */
-    for (const auto& computed_column : m_computed_columns) {
-        const std::string& name = std::get<0>(computed_column);
-        t_computed_function_name computed_function_name = std::get<1>(computed_column);
-        std::vector<std::string> input_column_names = std::get<2>(computed_column);
-        t_dtype return_type;
-
-        // Accumulate input dtypes to search for the right computation
-        std::vector<t_dtype> input_types;
-        for (const auto& input_column : input_column_names) {
-            input_types.push_back(schema->get_dtype(input_column));
-        }
-
-        t_computation computation = t_computed_column::get_computation(
-            computed_function_name, input_types);
-        t_dtype output_column_type = computation.m_return_type;
-
-        // Add the column to the schema.
-        schema->add_column(name, output_column_type);
-    }
-
     /*
      * Provide aggregates for columns that are shown but NOT specified in 
      * `m_aggregates`, including computed columns that are in the `columns`

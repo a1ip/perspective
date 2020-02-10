@@ -1338,6 +1338,41 @@ namespace binding {
             column_only = true;
         }
 
+        // Fill the computed columns vector with tuples
+        auto js_computed_columns = config.call<std::vector<std::vector<t_val>>>("get_computed_columns");
+        std::vector<std::tuple<std::string, t_computed_function_name, std::vector<std::string>>> computed_columns;
+
+        for (auto c : js_computed_columns) {
+            std::string computed_column_name = c.at(0).as<std::string>();
+            t_computed_function_name computed_function_name = 
+                str_to_computed_function_name(c.at(1).as<std::string>());
+            std::vector<std::string> input_columns = 
+                vecFromArray<t_val, std::string>(c.at(2));
+
+            /**
+             * Mutate the schema to add computed columns - the distinction 
+             * between `natural` and `computed` columns must be erased here
+             * as all lookups into `schema` must be valid for all computed
+             * columns on the View.
+             */
+            std::vector<t_dtype> input_types;
+            for (const auto& input_column : input_columns) {
+                input_types.push_back(schema->get_dtype(input_column));
+            }
+
+            t_computation computation = t_computed_column::get_computation(
+                computed_function_name, input_types);
+            t_dtype output_column_type = computation.m_return_type;
+
+            // Add the column to the schema.
+            schema->add_column(computed_column_name, output_column_type);
+
+            // Add the computed column to the config.
+            auto tp = std::make_tuple(
+                computed_column_name, computed_function_name, input_columns);
+            computed_columns.push_back(tp);
+        }
+
         // construct filters with filter terms, and fill the vector of tuples
         auto js_filter = config.call<std::vector<std::vector<t_val>>>("get_filter");
         std::vector<std::tuple<std::string, std::string, std::vector<t_tscalar>>> filter;
@@ -1359,19 +1394,6 @@ namespace binding {
             if (is_valid_filter(column_type, date_parser, filter_operator, filter_term)) {
                 filter.push_back(make_filter_term(column_type, date_parser, column_name, filter_op_str, filter_term));
             }
-        }
-
-        // Fill the computed columns vector with tuples
-        auto js_computed_columns = config.call<std::vector<std::vector<t_val>>>("get_computed_columns");
-        std::vector<std::tuple<std::string, t_computed_function_name, std::vector<std::string>>> computed_columns;
-
-        for (auto c : js_computed_columns) {
-            std::string computed_column_name = c.at(0).as<std::string>();
-            t_computed_function_name computed_function_name = str_to_computed_function_name(
-                c.at(1).as<std::string>());
-            std::vector<std::string> input_columns = vecFromArray<t_val, std::string>(c.at(2));
-            auto tp = std::make_tuple(computed_column_name, computed_function_name, input_columns);
-            computed_columns.push_back(tp);
         }
 
         // create the `t_view_config`

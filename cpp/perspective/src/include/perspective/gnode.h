@@ -294,8 +294,8 @@ t_gnode::notify_context(CTX_T* ctx, const t_data_table& flattened, const t_data_
     auto ctx_config = ctx->get_config();
     auto computed_columns = ctx_config.get_computed_columns();
 
-    std::cout << "Notifying" << std::endl;
-    flattened.pprint();
+    //std::cout << "Notifying" << std::endl;
+    //flattened.pprint();
 
     if (computed_columns.size() > 0) {
         // TODO: make sure all column lookups are by name
@@ -335,8 +335,8 @@ t_gnode::update_context_from_state(CTX_T* ctx, const t_data_table& flattened) {
         compute_columns<CTX_T>(ctx, flattened);
     }
 
-    std::cout << "Updating from state" << std::endl;
-    flattened.pprint();
+    //std::cout << "Updating from state" << std::endl;
+    //flattened.pprint();
 
     ctx->step_begin();
     ctx->notify(flattened);
